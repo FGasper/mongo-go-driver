@@ -1217,7 +1217,7 @@ func TestBackgroundRead(t *testing.T) {
 		defer cancel()
 		_, err = conn.readWireMessage(ctx)
 		regex := regexp.MustCompile(
-			`^connection\(.*\[-\d+\]\) incomplete read of message header: context deadline exceeded: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
+			`^connection\(.*\[-\d+\]\) incomplete read of message header: context deadline exceeded: timeoutMS of 10ms elapsed: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
 		)
 		assert.True(t, regex.MatchString(err.Error()), "error %q does not match pattern %q", err, regex)
 		assert.Nil(t, conn.awaitRemainingBytes, "conn.awaitRemainingBytes should be nil")
@@ -1268,7 +1268,7 @@ func TestBackgroundRead(t *testing.T) {
 		defer cancel()
 		_, err = conn.readWireMessage(ctx)
 		regex := regexp.MustCompile(
-			`^connection\(.*\[-\d+\]\) incomplete read of message header: context deadline exceeded: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
+			`^connection\(.*\[-\d+\]\) incomplete read of message header: context deadline exceeded: timeoutMS of 10ms elapsed: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
 		)
 		assert.True(t, regex.MatchString(err.Error()), "error %q does not match pattern %q", err, regex)
 		err = p.checkIn(conn)
@@ -1315,7 +1315,7 @@ func TestBackgroundRead(t *testing.T) {
 		defer cancel()
 		_, err = conn.readWireMessage(ctx)
 		regex := regexp.MustCompile(
-			`^connection\(.*\[-\d+\]\) incomplete read of message header: context deadline exceeded: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
+			`^connection\(.*\[-\d+\]\) incomplete read of message header: context deadline exceeded: timeoutMS of 10ms elapsed: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
 		)
 		assert.True(t, regex.MatchString(err.Error()), "error %q does not match pattern %q", err, regex)
 		err = p.checkIn(conn)
@@ -1367,7 +1367,7 @@ func TestBackgroundRead(t *testing.T) {
 		defer cancel()
 		_, err = conn.readWireMessage(ctx)
 		regex := regexp.MustCompile(
-			`^connection\(.*\[-\d+\]\) incomplete read of message header: context deadline exceeded: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
+			`^connection\(.*\[-\d+\]\) incomplete read of message header: context deadline exceeded: timeoutMS of 10ms elapsed: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
 		)
 		assert.True(t, regex.MatchString(err.Error()), "error %q does not match pattern %q", err, regex)
 		err = p.checkIn(conn)
@@ -1421,7 +1421,7 @@ func TestBackgroundRead(t *testing.T) {
 		defer cancel()
 		_, err = conn.readWireMessage(ctx)
 		regex := regexp.MustCompile(
-			`^connection\(.*\[-\d+\]\) incomplete read of full message: context deadline exceeded: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
+			`^connection\(.*\[-\d+\]\) incomplete read of full message: context deadline exceeded: timeoutMS of 10ms elapsed: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
 		)
 		assert.True(t, regex.MatchString(err.Error()), "error %q does not match pattern %q", err, regex)
 		err = p.checkIn(conn)
@@ -1471,7 +1471,7 @@ func TestBackgroundRead(t *testing.T) {
 		defer cancel()
 		_, err = conn.readWireMessage(ctx)
 		regex := regexp.MustCompile(
-			`^connection\(.*\[-\d+\]\) incomplete read of full message: context deadline exceeded: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
+			`^connection\(.*\[-\d+\]\) incomplete read of full message: context deadline exceeded: timeoutMS of 10ms elapsed: client timed out waiting for server response: read tcp 127.0.0.1:.*->127.0.0.1:.*: i\/o timeout$`,
 		)
 		assert.True(t, regex.MatchString(err.Error()), "error %q does not match pattern %q", err, regex)
 		err = p.checkIn(conn)

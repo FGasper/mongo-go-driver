@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/internal/csot"
 	"go.mongodb.org/mongo-driver/v2/x/bsonx/bsoncore"
 	"go.mongodb.org/mongo-driver/v2/x/mongo/driver"
 	"go.mongodb.org/mongo-driver/v2/x/mongo/driver/mnet"
@@ -528,7 +529,7 @@ func (oa *OIDCAuthenticator) doAuthHuman(ctx context.Context, cfg *driver.AuthCo
 	if err != nil {
 		return err
 	}
-	subCtx, cancel := context.WithTimeout(ctx, humanCallbackTimeout)
+	subCtx, cancel := csot.WithNamedTimeout(ctx, humanCallbackTimeout, "OIDC human callback timeout")
 	defer cancel()
 	// If the idpInfo exists, we can just do one step
 	if idpInfo != nil {
@@ -560,7 +561,7 @@ func (oa *OIDCAuthenticator) doAuthHuman(ctx context.Context, cfg *driver.AuthCo
 }
 
 func (oa *OIDCAuthenticator) doAuthMachine(ctx context.Context, cfg *driver.AuthConfig, machineCallback OIDCCallback) error {
-	subCtx, cancel := context.WithTimeout(ctx, machineCallbackTimeout)
+	subCtx, cancel := csot.WithNamedTimeout(ctx, machineCallbackTimeout, "OIDC machine callback timeout")
 	accessToken, err := oa.getAccessToken(subCtx,
 		cfg.Connection,
 		&OIDCArgs{

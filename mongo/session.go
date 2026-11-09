@@ -209,7 +209,7 @@ func (s *Session) WithTransaction(
 			// Wrap the user-provided Context in a new one that behaves like context.Background() for deadlines and
 			// cancellations, but forwards Value requests to the original one.
 			_ = s.AbortTransaction(newBackgroundContext(ctx))
-			return nil, ctx.Err()
+			return nil, csot.ContextError(ctx)
 		}
 
 	CommitLoop:

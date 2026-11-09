@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/internal/csot"
 	"go.mongodb.org/mongo-driver/v2/internal/handshake/operation"
 	"go.mongodb.org/mongo-driver/v2/x/mongo/driver"
 	"go.mongodb.org/mongo-driver/v2/x/mongo/driver/mnet"
@@ -116,7 +117,7 @@ func (r *rttMonitor) start() {
 	for {
 		conn = r.cfg.createConnectionFn()
 
-		ctx, cancel := context.WithTimeout(r.ctx, r.cfg.connectTimeout)
+		ctx, cancel := csot.WithNamedTimeout(r.ctx, r.cfg.connectTimeout, "connectTimeoutMS")
 
 		err := conn.connect(ctx)
 		cancel()
@@ -165,7 +166,7 @@ func (r *rttMonitor) runHellos(conn *connection) {
 		// server or a proxy stops responding to requests on the RTT connection but does not close
 		// the TCP socket, effectively creating an operation that will never complete. We expect
 		// that "connectTimeoutMS" provides at least enough time for a single round trip.
-		ctx, cancel := context.WithTimeout(r.ctx, r.cfg.connectTimeout)
+		ctx, cancel := csot.WithNamedTimeout(r.ctx, r.cfg.connectTimeout, "RTT monitor connectTimeoutMS")
 
 		start := time.Now()
 		iconn := mnet.NewConnection(initConnection{conn})

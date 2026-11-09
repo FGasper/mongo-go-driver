@@ -17,6 +17,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/event"
+	"go.mongodb.org/mongo-driver/v2/internal/csot"
 	"go.mongodb.org/mongo-driver/v2/internal/driverutil"
 	"go.mongodb.org/mongo-driver/v2/internal/handshake/operation"
 	"go.mongodb.org/mongo-driver/v2/internal/logger"
@@ -844,7 +845,7 @@ func (s *Server) setupHeartbeatConnection(ctx context.Context) error {
 
 	if s.cfg.connectTimeout != 0 {
 		var cancelFn context.CancelFunc
-		ctx, cancelFn = context.WithTimeout(ctx, s.cfg.connectTimeout)
+		ctx, cancelFn = csot.WithNamedTimeout(ctx, s.cfg.connectTimeout, "connectTimeoutMS")
 
 		defer cancelFn()
 	}
@@ -910,7 +911,7 @@ func withHeartbeatTimeout(parent context.Context, srv *Server) (context.Context,
 		return parent, cancel
 	}
 
-	return context.WithTimeout(parent, timeout)
+	return csot.WithNamedTimeout(parent, timeout, "heartbeat timeout")
 }
 
 // doHandshake will construct the hello operation use to execute a handshake

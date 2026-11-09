@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/internal/csot"
 	"go.mongodb.org/mongo-driver/v2/internal/mongoutil"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.mongodb.org/mongo-driver/v2/x/bsonx/bsoncore"
@@ -215,7 +216,7 @@ func (c *Cursor) next(ctx context.Context, nonBlocking bool) bool {
 	// if one is set.
 	if _, ok := ctx.Deadline(); !ok && c.hasClientTimeout {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.clientTimeout)
+		ctx, cancel = csot.WithNamedTimeout(ctx, c.clientTimeout, "timeoutMS")
 
 		defer cancel()
 	}

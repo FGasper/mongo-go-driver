@@ -63,7 +63,7 @@ func WithTimeout(parent context.Context, timeout *time.Duration) (context.Contex
 
 	// If the parent does not have a dealine and the timeout is non-zero, then
 	// apply the timeout.
-	return context.WithTimeout(parent, dur)
+	return WithNamedTimeout(parent, dur, "timeoutMS")
 }
 
 // WithServerSelectionTimeout creates a context with a timeout that is the
@@ -78,7 +78,7 @@ func WithServerSelectionTimeout(
 		return parent, func() {}
 	}
 
-	return context.WithTimeout(parent, serverSelectionTimeout)
+	return WithNamedTimeout(parent, serverSelectionTimeout, "serverSelectionTimeoutMS")
 }
 
 // ZeroRTTMonitor implements the RTTMonitor interface and is used internally for testing. It returns 0 for all

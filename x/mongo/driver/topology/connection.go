@@ -20,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/internal/csot"
 	"go.mongodb.org/mongo-driver/v2/internal/driverutil"
 	"go.mongodb.org/mongo-driver/v2/mongo/address"
 	"go.mongodb.org/mongo-driver/v2/x/bsonx/bsoncore"
@@ -43,7 +44,12 @@ var (
 	defaultMaxMessageSize        uint32 = 48000000
 	errResponseTooLarge                 = errors.New("length of read message too large")
 	errLoadBalancedStateMismatch        = errors.New("driver attempted to initialize in load balancing mode, but the server does not support this mode")
+	errConnectAborted                   = errors.New("connection establishment aborted")
 )
+
+// contextDoneGracePeriod bounds how long transformNetworkError waits for an
+// expired context to report that it's done.
+const contextDoneGracePeriod = 10 * time.Millisecond
 
 func nextConnectionID() uint64 { return atomic.AddUint64(&globalConnectionID, 1) }
 
@@ -252,11 +258,11 @@ func (c *connection) connect(ctx context.Context) (err error) {
 	// cancellation still applies but with an added timeout to ensure the connectTimeoutMS option is applied to socket
 	// establishment and the TLS handshake as a whole. This is created outside of the connectContextMutex lock to avoid
 	// holding the lock longer than necessary.
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 
 	go func() {
-		defer cancel()
+		defer cancel(errConnectAborted)
 
 		c.connectListener.Listen(ctx, func() {})
 	}()
@@ -264,7 +270,7 @@ func (c *connection) connect(ctx context.Context) (err error) {
 	// Assign the result of DialContext to a temporary net.Conn to ensure that c.nc is not set in an error case.
 	tempNc, err := c.config.dialer.DialContext(ctx, c.addr.Network(), c.addr.String())
 	if err != nil {
-		connErr := ConnectionError{Wrapped: err, init: true, message: fmt.Sprintf("failed to connect to %s", c.addr)}
+		connErr := ConnectionError{Wrapped: csot.WrapCause(ctx, err), init: true, message: fmt.Sprintf("failed to connect to %s", c.addr)}
 		return wrapConnectionError(connErr)
 	}
 	c.nc = tempNc
@@ -282,7 +288,7 @@ func (c *connection) connect(ctx context.Context) (err error) {
 		tlsNc, err := configureTLS(ctx, c.config.tlsConnectionSource, c.nc, c.addr, tlsConfig, ocspOpts,
 			c.config.disableCertificateRevocationCheck)
 		if err != nil {
-			connErr := ConnectionError{Wrapped: err, init: true, message: fmt.Sprintf("failed to configure TLS for %s", c.addr)}
+			connErr := ConnectionError{Wrapped: csot.WrapCause(ctx, err), init: true, message: fmt.Sprintf("failed to configure TLS for %s", c.addr)}
 			return wrapConnectionError(connErr)
 		}
 		c.nc = tlsNc
@@ -385,7 +391,7 @@ func transformNetworkError(ctx context.Context, originalError error, contextDead
 
 	// If there was an error and the context was cancelled, we assume it happened due to the cancellation.
 	if errors.Is(ctx.Err(), context.Canceled) {
-		return ctx.Err()
+		return csot.ContextError(ctx)
 	}
 
 	// If there was a timeout error and the context deadline was used, we convert the error into
@@ -394,8 +400,26 @@ func transformNetworkError(ctx context.Context, originalError error, contextDead
 		return originalError
 	}
 	if netErr, ok := originalError.(net.Error); ok && netErr.Timeout() {
+		// The socket deadline is the context deadline, but the socket can time
+		// out moments before the context reports that it's done. Give the
+		// context a brief grace period so that the error carries its cause,
+		// falling back to context.DeadlineExceeded.
+		if deadline, ok := ctx.Deadline(); ok && ctx.Err() == nil && !time.Now().Before(deadline) {
+			grace := time.NewTimer(contextDoneGracePeriod)
+			select {
+			case <-ctx.Done():
+			case <-grace.C:
+			}
+			grace.Stop()
+		}
+
+		ctxErr := csot.ContextError(ctx)
+		if ctxErr == nil {
+			ctxErr = context.DeadlineExceeded
+		}
+
 		return fmt.Errorf("%w: %s: %s",
-			context.DeadlineExceeded,
+			ctxErr,
 			"client timed out waiting for server response",
 			originalError.Error())
 	}

@@ -32,6 +32,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/event"
+	"go.mongodb.org/mongo-driver/v2/internal/csot"
 	"go.mongodb.org/mongo-driver/v2/internal/driverutil"
 	"go.mongodb.org/mongo-driver/v2/internal/logger"
 	"go.mongodb.org/mongo-driver/v2/internal/randutil"
@@ -691,7 +692,7 @@ func (t *Topology) selectServerFromSubscription(
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, ServerSelectionError{Wrapped: ctx.Err(), Desc: current}
+			return nil, ServerSelectionError{Wrapped: csot.ContextError(ctx), Desc: current}
 		case current = <-subscriptionCh:
 		}
 

@@ -816,7 +816,7 @@ func (op Operation) Execute(ctx context.Context) error {
 		// round trip before the Context deadline. If ctx is a Timeout Context, use the 90th percentile RTT
 		// as a threshold. Otherwise, use the minimum observed RTT.
 		if ctx.Err() != nil {
-			err = ctx.Err()
+			err = csot.ContextError(ctx)
 		} else if deadline, ok := ctx.Deadline(); ok {
 			if time.Now().Add(srvr.RTTMonitor().Min()).After(deadline) {
 				err = fmt.Errorf("%w: %v", ErrDeadlineWouldBeExceeded, srvr.RTTMonitor().Stats())

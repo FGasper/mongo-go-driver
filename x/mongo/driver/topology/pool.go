@@ -8,6 +8,7 @@ package topology
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -17,6 +18,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/event"
+	"go.mongodb.org/mongo-driver/v2/internal/csot"
 	"go.mongodb.org/mongo-driver/v2/internal/logger"
 	"go.mongodb.org/mongo-driver/v2/mongo/address"
 	"go.mongodb.org/mongo-driver/v2/x/mongo/driver"
@@ -35,6 +37,10 @@ var ErrPoolNotPaused = PoolError("only a paused pool can be marked ready")
 
 // ErrPoolClosed is returned when attempting to check out a connection from a closed pool.
 var ErrPoolClosed = PoolError("attempted to check out a connection from closed connection pool")
+
+// errPoolClosing is the cancellation cause of the pool's background context,
+// which interrupts in-progress connection establishment when the pool closes.
+var errPoolClosing = errors.New("connection pool closed")
 
 // ErrConnectionClosed is returned from an attempt to use an already closed connection.
 var ErrConnectionClosed = ConnectionError{ConnectionID: "<closed>", message: "connection is closed"}
@@ -120,9 +126,9 @@ type pool struct {
 	// to the state of the guarded values must be made while holding the lock to prevent undefined
 	// behavior in the createConnections() waiting logic.
 	createConnectionsCond *sync.Cond
-	cancelBackgroundCtx   context.CancelFunc    // cancelBackgroundCtx is called to signal background goroutines to stop.
-	conns                 map[int64]*connection // conns holds all currently open connections.
-	newConnWait           wantConnQueue         // newConnWait holds all wantConn requests for new connections.
+	cancelBackgroundCtx   context.CancelCauseFunc // cancelBackgroundCtx is called to signal background goroutines to stop.
+	conns                 map[int64]*connection   // conns holds all currently open connections.
+	newConnWait           wantConnQueue           // newConnWait holds all wantConn requests for new connections.
 
 	idleMu         sync.Mutex    // idleMu guards idleConns, idleConnWait
 	idleConns      []*connection // idleConns holds all idle connections.
@@ -238,7 +244,7 @@ func newPool(config poolConfig, connOpts ...ConnectionOption) *pool {
 	// maintain() background goroutines to stop. Also create a "backgroundDone" WaitGroup that is
 	// used to wait for the background goroutines to return.
 	var ctx context.Context
-	ctx, pool.cancelBackgroundCtx = context.WithCancel(context.Background())
+	ctx, pool.cancelBackgroundCtx = context.WithCancelCause(context.Background())
 
 	for i := 0; i < int(pool.maxConnecting); i++ {
 		pool.backgroundDone.Add(1)
@@ -341,7 +347,7 @@ func (p *pool) close(ctx context.Context) {
 	// is also synchronized by a lock. Otherwise, we run into an intermittent bug that prevents the
 	// createConnections() goroutines from exiting.
 	p.createConnectionsCond.L.Lock()
-	p.cancelBackgroundCtx()
+	p.cancelBackgroundCtx(errPoolClosing)
 	p.createConnectionsCond.Broadcast()
 	p.createConnectionsCond.L.Unlock()
 
@@ -679,12 +685,12 @@ func (p *pool) checkOut(ctx context.Context) (conn *connection, err error) {
 				Address:  p.address.String(),
 				Duration: duration,
 				Reason:   event.ReasonTimedOut,
-				Error:    ctx.Err(),
+				Error:    csot.ContextError(ctx),
 			})
 		}
 
 		err := WaitQueueTimeoutError{
-			Wrapped:              ctx.Err(),
+			Wrapped:              csot.ContextError(ctx),
 			maxPoolSize:          p.maxSize,
 			totalConnections:     p.totalConnectionCount(),
 			availableConnections: p.availableConnectionCount(),
@@ -1230,7 +1236,7 @@ func (p *pool) createConnections(ctx context.Context, wg *sync.WaitGroup) {
 
 		connctx := context.Background()
 		if p.connectTimeout != 0 {
-			connctx, cancel = context.WithTimeout(ctx, p.connectTimeout)
+			connctx, cancel = csot.WithNamedTimeout(ctx, p.connectTimeout, "connectTimeoutMS")
 		}
 
 		err := conn.connect(connctx)
